@@ -18,8 +18,15 @@ class FlickrDataset(Dataset):
     def __init__(self, file_name, dtype="train"):
 
         # read image ids
+        self.images_directory = config.IMAGES_DIRECTORY
+        
         with open(file_name, "r") as f:
             self.image_ids = f.read().strip().splitlines()
+            
+        img_caption_dict = build_features.load_img_caption_data(
+                config.CAPTIONS_TOKENS_FILE)
+        
+        self.img_caption_dict = img_caption_dict
         
         # create word mappings
         word_mapping_fname = config.FEATURES_DIRECTORY / "word_mappings.pkl"
@@ -37,9 +44,7 @@ class FlickrDataset(Dataset):
             
             # create vocabulary
             print("Creating word maps")
-            img_caption_dict = build_features.load_img_caption_data(
-                config.CAPTIONS_TOKENS_FILE)
-
+            
             # merge caption text data
             text_data = " ".join([" ".join(txt) for txt in 
                                   img_caption_dict.values()])
@@ -62,20 +67,47 @@ class FlickrDataset(Dataset):
 
             print("loading image features")
             
+            # load features
             self.image_features = torch.load(img_features_fname)
             
         else:
             
-            features = build_features.extract_image_features(self.image_ids)
             
-            self.image_features = features
+            image_features = build_features.extract_image_features(
+                self.images_directory,
+                self.image_ids)
+            
+            self.image_features = image_features
             
             # save features            
-            torch.save(features, img_features_fname)
+            torch.save(image_features, img_features_fname)
             
             
-    def __getitem__(self):
-        return
+    def __getitem__(self, index):
+        
+        img_fname = self.image_ids[index]
+        
+        # load image features
+        if(img_fname in self.image_features.keys()):
+            
+            img_tensor = self.image_features[img_fname]
+        
+        else:
+            
+            img_features = build_features.extract_image_features(
+                self.images_directory,
+                self.img_fname)
+            
+            img_tensor = img_features[img_fname]
+        
+        # load caption features
+        caption_txt = self.img_caption_dict[img_fname]
+        
+        txt_tensor = torch.tensor(build_features.convert_text_to_int(
+            caption_txt[1], self.word_to_int_map))
+        
+        
+        return img_tensor, txt_tensor
 
     def __len__(self):
         return len(self.img_caption_dict)
@@ -83,6 +115,7 @@ class FlickrDataset(Dataset):
     
 if __name__ == "__main__":
 
-    #training_dataset = FlickrDataset(file_name=config.CAPTIONS_TRAIN_FILE, dtype="train")
-    #validation_dataset = FlickrDataset(file_name=config.CAPTIONS_VALIDATION_FILE, dtype="valid")
+    training_dataset = FlickrDataset(file_name=config.CAPTIONS_TRAIN_FILE, dtype="train")
+    validation_dataset = FlickrDataset(file_name=config.CAPTIONS_VALIDATION_FILE, dtype="valid")
     test_dataset = FlickrDataset(file_name=config.CAPTIONS_TEST_FILE, dtype="test")
+    print(test_dataset[0])

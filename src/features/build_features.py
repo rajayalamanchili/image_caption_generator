@@ -69,7 +69,7 @@ def create_word_mappings(text_str):
     """
 
     # create word to int, int to word mappings
-    text_str = data_utils.preprocess_text(text_str).split()
+    text_str = preprocess_text(text_str).split()
     unique_words = set(text_str)
 
     word_to_int_map = {word: idx for idx, word in enumerate(unique_words)}
@@ -88,7 +88,7 @@ def create_img_caption_int_data(filepath):
     print("\nLoading caption data : started")
     
     # load caption data
-    img_caption_dict = data_utils.load_img_caption_data(filepath)
+    img_caption_dict = load_img_caption_data(filepath)
 
     # merge caption text data
     text_data = " ".join([" ".join(txt) for txt in img_caption_dict.values()])
@@ -117,11 +117,9 @@ def convert_int_to_text(int_data, int_to_word_map):
 
     return " ".join([int_to_word_map[idx] for idx in int_data])
 
-def extract_image_features(file_list):
+def extract_image_features(img_directory, filename_list):
     
     print("\nExtracting image features : started")
-    
-    features = {}
     
     # check device for cpu or gpu
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -141,14 +139,18 @@ def extract_image_features(file_list):
                                         transforms.Normalize((0.5, 0.5, 0.5),
                                                              (0.5, 0.5, 0.5))])
     # extract features
-    for img_id in tqdm(file_list, desc="Processing images"):
+    with torch.no_grad():
+    
+        features = {}
         
-        img = Image.open(config.IMAGES_DIRECTORY / img_id)
-        
-        img = img_transform(img)
-        img.to(device)
-        
-        features[img_id] = model(img.unsqueeze(0))
+        for img_fname in tqdm(filename_list, desc="Processing images"):
+            
+            img = Image.open(img_directory / img_fname)
+            
+            img = img_transform(img)
+            img.to(device)
+            
+            features[img_fname] = model(img.unsqueeze(0))
         
     return features
     
